@@ -9,7 +9,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # GitHub 仓库 raw 地址
-REPO_URL="https://raw.githubusercontent.com/10000ge10000/aliyun_monitor/main/src"
+REPO_URL="https://taro.cat/raw/TaroCats/alires/refs/heads/main"
 TARGET_DIR="/opt/scripts"
 VENV_DIR="${TARGET_DIR}/venv"
 CONFIG_FILE="${TARGET_DIR}/config.json"
