@@ -4,6 +4,7 @@ import json
 import sys
 import warnings
 import datetime
+import time
 import requests
 # 修正 urllib3 在 Python 3.12 下引发的 SNI 丢失问题
 try:
@@ -38,15 +39,17 @@ def load_config():
         return json.load(f)
 
 def send_tg_report(tg_conf, message):
-    #if not tg_conf.get('bot_token') or not tg_conf.get('chat_id'):
-    #    return
+    bot_token = tg_conf.get('bot_token')
+    chat_id = tg_conf.get('chat_id')
+    if not bot_token or not chat_id:
+        return
     try:
-        url = f"https://api.telegram.org/bot{tg_conf['bot_token']}/sendMessage"
-        data = {"chat_id": tg_conf['chat_id'], "text": message, "parse_mode": "Markdown"}
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+        data = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
         rep = requests.post(url, json=data, timeout=10)
         print(rep)
-    except:
-        print('fall send')
+    except Exception as e:
+        print(f"Failed to send TG report: {e}")
         pass
 
 def do_common_request(client, domain, version, action, params=None, method='POST', timeout=30, retries=3):
@@ -67,7 +70,6 @@ def do_common_request(client, domain, version, action, params=None, method='POST
             return json.loads(response.decode('utf-8'))
         except Exception as e:
             if attempt < retries:
-                import time
                 time.sleep(2 * attempt)
                 continue
             return None

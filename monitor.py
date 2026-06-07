@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import json
 import sys
 import logging
@@ -106,36 +106,57 @@ def reset_start_failures(state, instance_id):
 # ---------- TG 通知 ----------
 
 def send_tg_alert(tg_conf, title, message, color_status):
-#    if not tg_conf.get('bot_token') or not tg_conf.get('chat_id'):
-#        return
+    bot_token = tg_conf.get('bot_token')
+    chat_id = tg_conf.get('chat_id')
+    if not bot_token or not chat_id:
+        return
     icon = "\u2705" if color_status == "green" else "\U0001f6a8"
     try:
-        url = f"https://api.telegram.org/bot{tg_conf['bot_token']}/sendMessage"
+        url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         text = f"{icon} *[{title}]*\n\n{message}"
-        data = {"chat_id": tg_conf['chat_id'], "text": text, "parse_mode": "Markdown"}
+        data = {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
         requests.post(url, json=data, timeout=5)
     except Exception as e:
         logger.error(f"TG发送失败: {e}")
+
+# ---------- API 请求 (带重试) ----------
+
+def do_common_request(client, request, retries=3):
+    for attempt in range(1, retries + 1):
+        try:
+            response = client.do_action_with_exception(request)
+            return json.loads(response.decode('utf-8'))
+        except Exception as e:
+            if attempt < retries:
+                time.sleep(2 * attempt)
+                continue
+            logger.error(f"API请求失败 (已重试 {retries} 次): {e}")
+            raise e
 
 # ---------- 查询实例状态 ----------
 
 def get_instance_status(client, instance_id):
     req_ecs = DescribeInstancesRequest()
     req_ecs.set_InstanceIds(json.dumps([instance_id]))
-    resp_ecs = client.do_action_with_exception(req_ecs)
-    data_ecs = json.loads(resp_ecs.decode('utf-8'))
-    instances = data_ecs.get("Instances", {}).get("Instance", [])
-    if not instances:
+    try:
+        data_ecs = do_common_request(client, req_ecs)
+        instances = data_ecs.get("Instances", {}).get("Instance", [])
+        if not instances:
+            return None
+        return instances[0].get("Status")
+    except Exception:
         return None
-    return instances[0].get("Status")
 
 # ---------- 核心逻辑 ----------
 
 def check_and_act(user, tg_conf, state):
     instance_id = user['instance_id']
     name        = user.get('name', instance_id)
+    ak = user.get('ak')
+    sk = user.get('sk')
+    region = user.get('region')
     try:
-        client = AcsClient(user['ak'], user['sk'], user['region'])
+        client = AcsClient(ak, sk, region)
 
         # 1. 获取流量
         req_traffic = CommonRequest()
@@ -146,11 +167,14 @@ def check_and_act(user, tg_conf, state):
         req_traffic.set_connect_timeout(5000)   # 连接 5 秒内必须成功，避免黑洞 IP 卡死
         req_traffic.set_read_timeout(15000)      # 读取 15 秒
         # CDT 流量查询强制使用 cn-hangzhou client 避免某些地域导致卡死
-        cdt_client = AcsClient(user['ak'], user['sk'], 'cn-hangzhou')
-        resp_traffic = cdt_client.do_action_with_exception(req_traffic)
-        data_traffic = json.loads(resp_traffic.decode('utf-8'))
-        total_bytes = sum(d.get('Traffic', 0) for d in data_traffic.get('TrafficDetails', []))
-        curr_gb = total_bytes / (1024 ** 3)
+        cdt_client = AcsClient(ak, sk, 'cn-hangzhou')
+        try:
+            data_traffic = do_common_request(cdt_client, req_traffic)
+            total_bytes = sum(d.get('Traffic', 0) for d in data_traffic.get('TrafficDetails', []))
+            curr_gb = total_bytes / (1024 ** 3)
+        except Exception as e:
+            logger.error(f"[{name}] 获取流量失败: {e}")
+            curr_gb = -1
 
         # 2. 获取实例当前状态
         status = get_instance_status(client, instance_id)
@@ -160,6 +184,10 @@ def check_and_act(user, tg_conf, state):
 
         # 3. 决策
         limit = user.get('traffic_limit', 180)
+
+        if curr_gb == -1:
+            logger.warning(f"[{name}] 流量获取失败，本轮仅监控状态，不执行启停干预。状态: {status}")
+            return
 
         if curr_gb < limit:
             # ---- 流量安全 ----
