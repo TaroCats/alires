@@ -17,30 +17,30 @@ CONFIG_FILE="${TARGET_DIR}/config.json"
 # 全局变量，用于在函数间传递生成的 JSON 数据
 CURRENT_USER_JSON=""
 
-echo -e "${BLUE}=============================================================${NC}"
-echo -e "${BLUE}    阿里云 CDT 流量监控 & 日报 一键部署/管理脚本 (修复增强版)  ${NC}"
-echo -e "${BLUE}=============================================================${NC}"
+printf '%b\\n' "${BLUE}=============================================================${NC}"
+printf '%b\\n' "${BLUE}    阿里云 CDT 流量监控 & 日报 一键部署/管理脚本 (修复增强版)  ${NC}"
+printf '%b\\n' "${BLUE}=============================================================${NC}"
 
-if [ "$EUID" -ne 0 ]; then
-  echo -e "${RED}请使用 root 权限运行 (sudo -i)${NC}"
+if [ "$(id -u)" -ne 0 ]; then
+  printf '%b\\n' "${RED}请使用 root 权限运行 (sudo -i)${NC}"
   exit 1
 fi
 
 # ================= 核心功能函数 =================
 
 # 收集单个用户信息的函数
-function get_single_user_json() {
+get_single_user_json() {
     local AK="" SK="" REGION="" INSTANCE="" NAME="" LIMIT="" BILL_ENDPOINT="" CURRENCY=""
 
-    echo -e "\n${BLUE}>> 配置阿里云账号/实例信息${NC}"
+    printf '%b\\n' "\n${BLUE}>> 配置阿里云账号/实例信息${NC}"
     read -p "请输入备注名 (例如 HK-Server): " NAME
     
-    echo -e "${CYAN}💡 提示: AccessKey 在 RAM 用户详情页 -> 创建 AccessKey${NC}"
+    printf '%b\\n' "${CYAN}💡 提示: AccessKey 在 RAM 用户详情页 -> 创建 AccessKey${NC}"
     read -p "AccessKey ID: " AK
     read -p "AccessKey Secret: " SK
     
     # --- 按实例区分国内外账单体系 ---
-    echo -e "\n${CYAN}💡 提示: 请选择该账号所属的阿里云类型 (决定账单查询节点与货币单位)${NC}"
+    printf '%b\\n' "\n${CYAN}💡 提示: 请选择该账号所属的阿里云类型 (决定账单查询节点与货币单位)${NC}"
     echo "  1) 国内区 (阿里云中国站，人民币 ￥ 结算)"
     echo "  2) 国际区 (阿里云国际站，美元 $ 结算)"
     read -p "请选择 (1-2, 默认 1): " ACC_TYPE_OPT
@@ -51,10 +51,10 @@ function get_single_user_json() {
         BILL_ENDPOINT="business.aliyuncs.com"
         CURRENCY="¥"
     fi
-    echo -e "${GREEN}已设置为: 账单节点=$BILL_ENDPOINT | 货币=$CURRENCY${NC}\n"
+    printf '%b\\n' "${GREEN}已设置为: 账单节点=$BILL_ENDPOINT | 货币=$CURRENCY${NC}\n"
     # --------------------------------------
 
-    echo -e "${CYAN}💡 提示: 请选择 ECS 实例所在的区域 (输入数字)${NC}"
+    printf '%b\\n' "${CYAN}💡 提示: 请选择 ECS 实例所在的区域 (输入数字)${NC}"
     echo "  1) 香港 (cn-hongkong)"
     echo "  2) 新加坡 (ap-southeast-1)"
     echo "  3) 日本-东京 (ap-northeast-1)"
@@ -76,7 +76,7 @@ function get_single_user_json() {
         *) read -p "请输入 Region ID (如 cn-shanghai): " REGION ;;
     esac
 
-    echo -e "${CYAN}💡 提示: 请前往 ECS 控制台 -> 实例列表 -> 实例 ID 列 (以 i- 开头)${NC}"
+    printf '%b\\n' "${CYAN}💡 提示: 请前往 ECS 控制台 -> 实例列表 -> 实例 ID 列 (以 i- 开头)${NC}"
     read -p "ECS 实例 ID: " INSTANCE
     
     read -p "关机阈值 (GB, 默认180): " LIMIT
@@ -87,15 +87,15 @@ function get_single_user_json() {
 }
 
 # 完整安装流程 (首次运行)
-function run_full_install() {
+run_full_install() {
     # 1. 目录准备
     if [ ! -d "$TARGET_DIR" ]; then
         mkdir -p "$TARGET_DIR"
-        echo -e "${GREEN}创建目录: ${TARGET_DIR}${NC}"
+        printf '%b\\n' "${GREEN}创建目录: ${TARGET_DIR}${NC}"
     fi
 
     # 2. 安装依赖
-    echo -e "${YELLOW}>> 安装系统依赖...${NC}"
+    printf '%b\\n' "${YELLOW}>> 安装系统依赖...${NC}"
     if [ -f /etc/debian_version ]; then
         apt-get update -y && apt-get install -y python3 python3-venv python3-pip cron wget
         systemctl enable cron && systemctl start cron
@@ -107,26 +107,26 @@ function run_full_install() {
     # 3. 虚拟环境
     if [ ! -d "$VENV_DIR" ]; then
         python3 -m venv "$VENV_DIR"
-        echo -e "${GREEN}虚拟环境创建完成。${NC}"
+        printf '%b\\n' "${GREEN}虚拟环境创建完成。${NC}"
     fi
 
-    echo -e "${YELLOW}>> 安装 Python 依赖库...${NC}"
+    printf '%b\\n' "${YELLOW}>> 安装 Python 依赖库...${NC}"
     "$VENV_DIR/bin/pip" install requests aliyun-python-sdk-core aliyun-python-sdk-ecs aliyun-python-sdk-bssopenapi --upgrade >/dev/null 2>&1
 
     # 4. 下载源码
-    echo -e "${YELLOW}>> 从 GitHub 下载最新脚本...${NC}"
+    printf '%b\\n' "${YELLOW}>> 从 GitHub 下载最新脚本...${NC}"
     wget -q -O "${TARGET_DIR}/monitor.py" "${REPO_URL}/monitor.py"
     wget -q -O "${TARGET_DIR}/report.py" "${REPO_URL}/report.py"
 
     if [ ! -s "${TARGET_DIR}/monitor.py" ] || [ ! -s "${TARGET_DIR}/report.py" ]; then
-        echo -e "${RED}下载失败！请检查网络或 GitHub 地址是否正确。${NC}"
+        printf '%b\\n' "${RED}下载失败！请检查网络或 GitHub 地址是否正确。${NC}"
         exit 1
     fi
 
     # 6. 交互式配置 Telegram
-    echo -e "\n${BLUE}### 配置 Telegram ###${NC}"
-    echo -e "1. 联系 ${CYAN}@BotFather${NC} -> 创建机器人获取 Token"
-    echo -e "2. 联系 ${CYAN}@userinfobot${NC} -> 获取您的 Chat ID"
+    printf '%b\\n' "\n${BLUE}### 配置 Telegram ###${NC}"
+    printf '%b\\n' "1. 联系 ${CYAN}@BotFather${NC} -> 创建机器人获取 Token"
+    printf '%b\\n' "2. 联系 ${CYAN}@userinfobot${NC} -> 获取您的 Chat ID"
     read -p "请输入 Telegram Bot Token: " TG_TOKEN
     read -p "请输入 Telegram Chat ID: " TG_ID
 
@@ -143,7 +143,7 @@ function run_full_install() {
 
         echo ""
         read -p "是否继续添加第二个账号/实例? (y/n): " CONTIN
-        if [[ ! "$CONTIN" =~ ^[Yy]$ ]]; then
+        if [ "$CONTIN" != "y" ] && [ "$CONTIN" != "Y" ]; then
             break
         fi
     done
@@ -160,10 +160,10 @@ function run_full_install() {
     ]
 }
 EOF
-    echo -e "${GREEN}配置文件已生成: ${CONFIG_FILE}${NC}"
+    printf '%b\\n' "${GREEN}配置文件已生成: ${CONFIG_FILE}${NC}"
 
     # 9. 设置 Crontab
-    echo -e "${YELLOW}>> 配置定时任务...${NC}"
+    printf '%b\\n' "${YELLOW}>> 配置定时任务...${NC}"
     crontab -l > /tmp/cron_bk 2>/dev/null
     grep -v "aliyun_monitor" /tmp/cron_bk > /tmp/cron_clean
     echo "*/5 * * * * ${VENV_DIR}/bin/python ${TARGET_DIR}/monitor.py >> ${TARGET_DIR}/monitor.log 2>&1 #aliyun_monitor" >> /tmp/cron_clean
@@ -171,21 +171,21 @@ EOF
     crontab /tmp/cron_clean
     rm /tmp/cron_bk /tmp/cron_clean
 
-    echo -e "\n${GREEN}🎉 安装与配置完成！${NC}"
-    echo -e "您可以使用以下命令手动测试日报发送："
-    echo -e "${YELLOW}${VENV_DIR}/bin/python ${TARGET_DIR}/report.py${NC}"
+    printf '%b\\n' "\n${GREEN}🎉 安装与配置完成！${NC}"
+    printf '%b\\n' "您可以使用以下命令手动测试日报发送："
+    printf '%b\\n' "${YELLOW}${VENV_DIR}/bin/python ${TARGET_DIR}/report.py${NC}"
 }
 
 # 管理菜单 (二次运行)
-function run_manage_menu() {
+run_manage_menu() {
     while true; do
-        echo -e "\n${GREEN}=====================================${NC}"
-        echo -e "${YELLOW}已检测到存在配置文件，请选择管理操作：${NC}"
+        printf '%b\\n' "\n${GREEN}=====================================${NC}"
+        printf '%b\\n' "${YELLOW}已检测到存在配置文件，请选择管理操作：${NC}"
         echo "1) 添加新的监控实例 (Add)"
         echo "2) 删除已有监控实例 (Delete)"
         echo "3) 更新脚本并重置所有配置 (Update & Reset)"
         echo "4) 退出脚本 (Exit)"
-        echo -e "${GREEN}=====================================${NC}"
+        printf '%b\\n' "${GREEN}=====================================${NC}"
         read -p "请输入序号 (1-4): " MENU_OPT
 
         case $MENU_OPT in
@@ -200,10 +200,10 @@ data['users'].append(json.loads(os.environ['CURRENT_USER_JSON']))
 with open('$CONFIG_FILE', 'w') as f:
     json.dump(data, f, indent=4)
 "
-                echo -e "${GREEN}✅ 实例添加成功！配置文件已更新。${NC}"
+                printf '%b\\n' "${GREEN}✅ 实例添加成功！配置文件已更新。${NC}"
                 ;;
             2)
-                echo -e "\n${BLUE}当前监控的实例列表：${NC}"
+                printf '%b\\n' "\n${BLUE}当前监控的实例列表：${NC}"
                 python3 -c "
 import json
 with open('$CONFIG_FILE', 'r') as f:
@@ -216,7 +216,7 @@ else:
 "
                 echo ""
                 read -p "请输入要删除的实例序号 (输入 q 取消): " DEL_IDX
-                if [[ "$DEL_IDX" == "q" || -z "$DEL_IDX" ]]; then
+                if [ "$DEL_IDX" = "q" ] || [ -z "$DEL_IDX" ]; then
                     continue
                 fi
                 python3 -c "
@@ -234,19 +234,19 @@ except Exception as e:
 "
                 ;;
             3)
-                echo -e "${RED}⚠️ 此操作将更新代码并覆盖现有的 config.json！${NC}"
+                printf '%b\\n' "${RED}⚠️ 此操作将更新代码并覆盖现有的 config.json！${NC}"
                 read -p "确认要更新并重置配置吗？(y/n): " CONFIRM_REINSTALL
-                if [[ "$CONFIRM_REINSTALL" =~ ^[Yy]$ ]]; then
+                if [ "$CONFIRM_REINSTALL" = "y" ] || [ "$CONFIRM_REINSTALL" = "Y" ]; then
                     run_full_install
                     exit 0
                 fi
                 ;;
             4)
-                echo -e "${GREEN}退出脚本。${NC}"
+                printf '%b\\n' "${GREEN}退出脚本。${NC}"
                 exit 0
                 ;;
             *)
-                echo -e "${RED}输入无效，请重新选择。${NC}"
+                printf '%b\\n' "${RED}输入无效，请重新选择。${NC}"
                 ;;
         esac
     done
