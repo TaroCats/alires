@@ -150,11 +150,12 @@ def get_instance_status(client, instance_id):
 # ---------- 核心逻辑 ----------
 
 def check_and_act(user, tg_conf, state):
+    ak = user['ak']
+    sk = user['sk']
+    region = user['region']
     instance_id = user['instance_id']
     name        = user.get('name', instance_id)
-    ak = user.get('ak')
-    sk = user.get('sk')
-    region = user.get('region')
+    
     try:
         client = AcsClient(ak, sk, region)
 
