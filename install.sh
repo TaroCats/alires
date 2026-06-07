@@ -98,6 +98,7 @@ function run_full_install() {
     echo -e "${YELLOW}>> 安装系统依赖...${NC}"
     if [ -f /etc/debian_version ]; then
         apt-get update -y && apt-get install -y python3 python3-venv python3-pip cron wget
+        systemctl enable cron && systemctl start cron
     elif [ -f /etc/redhat-release ]; then
         yum install -y python3 python3-pip cronie wget
         systemctl enable crond && systemctl start crond
@@ -117,7 +118,7 @@ function run_full_install() {
     wget -q -O "${TARGET_DIR}/monitor.py" "${REPO_URL}/monitor.py"
     wget -q -O "${TARGET_DIR}/report.py" "${REPO_URL}/report.py"
 
-    if [ ! -s "${TARGET_DIR}/monitor.py" ]; then
+    if [ ! -s "${TARGET_DIR}/monitor.py" ] || [ ! -s "${TARGET_DIR}/report.py" ]; then
         echo -e "${RED}下载失败！请检查网络或 GitHub 地址是否正确。${NC}"
         exit 1
     fi
@@ -190,11 +191,12 @@ function run_manage_menu() {
         case $MENU_OPT in
             1)
                 get_single_user_json
-                python3 -c "
+                CURRENT_USER_JSON="$CURRENT_USER_JSON" python3 -c "
 import json
+import os
 with open('$CONFIG_FILE', 'r') as f:
     data = json.load(f)
-data['users'].append(json.loads('''$CURRENT_USER_JSON'''))
+data['users'].append(json.loads(os.environ['CURRENT_USER_JSON']))
 with open('$CONFIG_FILE', 'w') as f:
     json.dump(data, f, indent=4)
 "
