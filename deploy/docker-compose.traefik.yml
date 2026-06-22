@@ -1,0 +1,15 @@
+services:
+  alires:
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.alires.rule: Host(`${TRAEFIK_HOST}`)
+      traefik.http.routers.alires.entrypoints: websecure
+      traefik.http.routers.alires.tls: "true"
+      traefik.http.services.alires.loadbalancer.server.port: "8000"
+    networks:
+      - default
+      - traefik
+
+networks:
+  traefik:
+    external: true

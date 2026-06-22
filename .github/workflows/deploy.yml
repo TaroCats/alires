@@ -1,0 +1,148 @@
+name: Deploy
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Deploy ref, branch or tag"
+        required: false
+        default: main
+        type: string
+      compose_args:
+        description: "Extra docker compose arguments, for example -f docker-compose.yml -f deploy/docker-compose.traefik.yml"
+        required: false
+        default: ""
+        type: string
+      targets_json:
+        description: "Optional JSON array of deploy targets"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy_ref: ${{ steps.resolve.outputs.deploy_ref }}
+      targets: ${{ steps.resolve.outputs.targets }}
+    env:
+      RAW_TARGETS: ${{ inputs.targets_json || vars.DEPLOY_TARGETS }}
+      DEPLOY_REF_INPUT: ${{ inputs.ref }}
+      COMPOSE_ARGS_INPUT: ${{ inputs.compose_args }}
+    steps:
+      - name: Resolve deploy matrix
+        id: resolve
+        shell: bash
+        run: |
+          deploy_ref="${GITHUB_REF_NAME}"
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            deploy_ref="${DEPLOY_REF_INPUT:-main}"
+          fi
+
+          if [[ -z "${RAW_TARGETS}" ]]; then
+            echo "DEPLOY_TARGETS repository variable or targets_json input is required"
+            exit 1
+          fi
+
+          targets_json="$(
+            python3 - <<'PY'
+import json
+import os
+import sys
+
+raw_targets = os.environ["RAW_TARGETS"]
+compose_args_input = os.environ.get("COMPOSE_ARGS_INPUT", "").strip()
+
+try:
+    targets = json.loads(raw_targets)
+except json.JSONDecodeError as exc:
+    print(f"Invalid targets JSON: {exc}", file=sys.stderr)
+    sys.exit(1)
+
+if not isinstance(targets, list) or not targets:
+    print("Deploy targets JSON must be a non-empty array", file=sys.stderr)
+    sys.exit(1)
+
+normalized = []
+required_keys = ("name", "host", "user", "path")
+
+for item in targets:
+    if not isinstance(item, dict):
+        print("Each deploy target must be an object", file=sys.stderr)
+        sys.exit(1)
+    missing = [key for key in required_keys if not item.get(key)]
+    if missing:
+        print(f"Deploy target missing required keys: {', '.join(missing)}", file=sys.stderr)
+        sys.exit(1)
+
+    normalized.append(
+        {
+            "name": item["name"],
+            "host": item["host"],
+            "user": item["user"],
+            "port": str(item.get("port", 22)),
+            "path": item["path"],
+            "compose_args": item.get("compose_args", compose_args_input),
+        }
+    )
+
+print(json.dumps(normalized, separators=(",", ":")))
+PY
+          )"
+
+          {
+            echo "deploy_ref=${deploy_ref}"
+            echo "targets=${targets_json}"
+          } >> "${GITHUB_OUTPUT}"
+
+  deploy:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.prepare.outputs.targets) }}
+    concurrency:
+      group: deploy-${{ matrix.name }}
+      cancel-in-progress: false
+    steps:
+      - name: Deploy on ${{ matrix.name }} via SSH
+        env:
+          DEPLOY_REF: ${{ needs.prepare.outputs.deploy_ref }}
+          DEPLOY_PATH: ${{ matrix.path }}
+          COMPOSE_ARGS: ${{ matrix.compose_args }}
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ matrix.host }}
+          username: ${{ matrix.user }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ matrix.port }}
+          script_stop: true
+          envs: DEPLOY_REF,DEPLOY_PATH,COMPOSE_ARGS
+          script: |
+            set -eu
+
+            if [ -z "${DEPLOY_PATH}" ]; then
+              echo "DEPLOY_PATH is required"
+              exit 1
+            fi
+
+            cd "${DEPLOY_PATH}"
+            git fetch --all --tags origin
+
+            if git rev-parse -q --verify "refs/tags/${DEPLOY_REF}" >/dev/null; then
+              git checkout "tags/${DEPLOY_REF}"
+            else
+              git checkout "${DEPLOY_REF}"
+              git pull --ff-only origin "${DEPLOY_REF}"
+            fi
+
+            docker compose ${COMPOSE_ARGS} pull
+            docker compose ${COMPOSE_ARGS} up -d --remove-orphans
+            docker compose ${COMPOSE_ARGS} ps
