@@ -38,7 +38,7 @@ from api.schemas import (
 from api.security import TOKEN_TTL_SECONDS, hash_password, issue_token, require_auth
 from api.services.bootstrap import initialize_defaults
 from api.services.monitor import inspect_policy, run_monitor_job, send_daily_report
-from api.services.notification import send_message
+from api.services.notification import NotificationError, send_message
 from api.services.scheduler import scheduler_service
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -314,7 +314,12 @@ def delete_target(target_id: str, _: str = Depends(require_auth), db: Session = 
 def test_notification(payload: TestNotificationRequest, _: str = Depends(require_auth), db: Session = Depends(get_db)):
     target = require_entity(db.get(TelegramTarget, payload.target_id), "通知目标不存在")
     bot = require_entity(db.get(TelegramBot, target.bot_id), "机器人不存在")
-    send_message(bot, target, payload.title, payload.message)
+    try:
+        send_message(bot, target, payload.title, payload.message)
+    except NotificationError as exc:
+        db.add(JobRunLog(job_type="notification_test", success=False, summary=f"{target.name}: {exc}"))
+        db.commit()
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     db.add(JobRunLog(job_type="notification_test", success=True, summary=f"测试消息已发送到 {target.name}"))
     db.commit()
     return {"ok": True}
