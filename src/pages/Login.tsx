@@ -8,8 +8,8 @@ import { useAuthStore } from "@/store/auth";
 export default function Login() {
   const navigate = useNavigate();
   const setAuth = useAuthStore((state) => state.setAuth);
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("admin123");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -42,7 +42,7 @@ export default function Login() {
           </div>
         </div>
         <p className="mt-6 text-sm text-slate-400">
-          登录后可管理阿里云账号、实例恢复策略、TG 机器人和日报任务。默认管理员账号为 `admin` / `admin123`。
+          登录后可管理阿里云账号、实例恢复策略、TG 机器人和日报任务。
         </p>
         <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
           <label className="block">
@@ -50,6 +50,7 @@ export default function Login() {
             <input
               value={username}
               onChange={(event) => setUsername(event.target.value)}
+              placeholder="请输入管理员账号"
               className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none transition focus:border-cyan-400/50"
             />
           </label>
@@ -59,6 +60,7 @@ export default function Login() {
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
+              placeholder="请输入管理员密码"
               className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-white outline-none transition focus:border-cyan-400/50"
             />
           </label>
