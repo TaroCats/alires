@@ -93,8 +93,6 @@ jobs:
             suffix: x86
           - platform: linux/arm64
             suffix: arm64
-          - platform: linux/arm/v7
-            suffix: arm
     steps:
       - name: Checkout source
         uses: actions/checkout@v4

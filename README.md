@@ -260,7 +260,6 @@ sudo systemctl enable --now traefik
 2. 使用矩阵分别构建并推送以下 Linux Docker 镜像：
    - `linux/amd64` -> `x86`
    - `linux/arm64` -> `arm64`
-   - `linux/arm/v7` -> `arm`
 3. 合并上述镜像为多架构 Manifest，并发布统一标签。
 4. 在 `macos-latest` Runner 上执行构建校验，并生成一个 macOS 部署包作为 Release 附件。
 5. 在 tag 发布场景下自动创建 GitHub Release。
@@ -271,7 +270,6 @@ sudo systemctl enable --now traefik
 
 - `ghcr.io/<owner>/<repo>:v1.0.0-x86`
 - `ghcr.io/<owner>/<repo>:v1.0.0-arm64`
-- `ghcr.io/<owner>/<repo>:v1.0.0-arm`
 - `ghcr.io/<owner>/<repo>:v1.0.0`（多架构聚合标签）
 - `ghcr.io/<owner>/<repo>:latest`（仅 tag 发版时更新）
 
@@ -370,7 +368,7 @@ Docker 多平台镜像本质上面向 Linux 容器平台，因此不能直接生
 
 当前发版策略采用以下方式覆盖需求：
 
-- `arm / arm64 / x86`：通过 Docker Buildx 矩阵发布 Linux 多架构镜像。
+- `arm64 / x86`：通过 Docker Buildx 矩阵发布 Linux 多架构镜像。
 - `macOS`：通过 GitHub Actions 的 `macos-latest` Runner 执行构建校验，并输出 macOS 部署包附件。
 
 如果后续需要真正的原生 macOS 应用分发，可以再补充 `py2app`、`briefcase` 或桌面壳方案。
