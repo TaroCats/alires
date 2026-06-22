@@ -221,7 +221,7 @@ jobs:
           mkdir -p "${bundle_dir}"
           cp -R api "${bundle_dir}/api"
           cp -R dist "${bundle_dir}/dist"
-          cp README.md requirements.txt Dockerfile monitor.py report.py "${bundle_dir}/"
+          cp README.md requirements.txt Dockerfile "${bundle_dir}/"
           tar -czf "${archive_name}" "${bundle_dir}"
           echo "ARCHIVE_NAME=${archive_name}" >> "${GITHUB_ENV}"
 
