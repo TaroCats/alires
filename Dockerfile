@@ -27,7 +27,6 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY api ./api
-COPY monitor.py report.py ./
 COPY --from=frontend-build /app/dist ./dist
 
 RUN mkdir -p /app/data
